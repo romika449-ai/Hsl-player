@@ -58,34 +58,98 @@
       transition: opacity 0.05s ease;
     }
 
-    /* Gesture Status Badge */
-    .gesture-badge {
+    /* ===== MX PLAYER HUD STYLES ===== */
+    
+    /* 2X Pill Indicator (Top Center) */
+    .mx-speed-badge {
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: rgba(12, 16, 26, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      color: #6c8cff;
+      padding: 8px 18px;
+      border-radius: 30px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 30;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+    .mx-speed-badge.active {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* MX Player Vertical Slider Pill (Left & Right) */
+    .mx-slider-indicator {
       position: absolute;
       top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) scale(0.9);
-      background: rgba(10, 14, 22, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(8px);
-      color: #fff;
-      padding: 12px 24px;
-      border-radius: 30px;
-      font-size: 1rem;
-      font-weight: 600;
+      transform: translateY(-50%) scale(0.95);
+      background: rgba(10, 14, 24, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(14px);
+      padding: 16px 12px;
+      border-radius: 24px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       gap: 10px;
       opacity: 0;
       pointer-events: none;
-      z-index: 20;
+      z-index: 30;
       transition: opacity 0.2s ease, transform 0.2s ease;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      min-width: 52px;
     }
-    .gesture-badge.active {
+    .mx-slider-indicator.active {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      transform: translateY(-50%) scale(1);
+    }
+    .mx-slider-indicator.left {
+      left: 20px;
+    }
+    .mx-slider-indicator.right {
+      right: 20px;
     }
 
-    /* Double Tap Seek Feedback Ripples */
+    .mx-slider-icon {
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+    .mx-bar-wrap {
+      width: 6px;
+      height: 90px;
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      align-items: flex-end;
+    }
+    .mx-bar-fill {
+      width: 100%;
+      height: 100%;
+      background: #6c8cff;
+      border-radius: 6px;
+      transition: height 0.05s linear;
+    }
+    .mx-slider-text {
+      color: #eaf0ff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    /* Double Tap Seek Feedback */
     .seek-ripple {
       position: absolute;
       top: 0;
@@ -95,12 +159,12 @@
       align-items: center;
       justify-content: center;
       color: #fff;
-      font-size: 1.1rem;
-      font-weight: bold;
+      font-size: 1.2rem;
+      font-weight: 700;
       opacity: 0;
       pointer-events: none;
-      z-index: 15;
-      background: rgba(255, 255, 255, 0.08);
+      z-index: 20;
+      background: rgba(255, 255, 255, 0.07);
       transition: opacity 0.25s ease;
     }
     .seek-ripple.left {
@@ -115,7 +179,7 @@
       opacity: 1;
     }
 
-    /* Control Bar Alignment */
+    /* ===== CONTROL BAR ===== */
     .video-js .vjs-control-bar {
       background: rgba(10, 14, 22, 0.85) !important;
       backdrop-filter: blur(14px) saturate(1.4);
@@ -336,6 +400,12 @@
       .video-js .vjs-mute-control {
         width: 28px !important;
       }
+      .mx-slider-indicator.left {
+        left: 10px;
+      }
+      .mx-slider-indicator.right {
+        right: 10px;
+      }
     }
   </style>
 </head>
@@ -345,8 +415,28 @@
   <div class="video-container" id="touch-container">
     <div id="brightness-overlay"></div>
 
-    <!-- Live Status Indicators -->
-    <div class="gesture-badge" id="gesture-badge"></div>
+    <!-- 2X Speed Floating Badge -->
+    <div class="mx-speed-badge" id="speed-badge">▶▶ 2X Speed</div>
+
+    <!-- MX Player Left Slider: Brightness -->
+    <div class="mx-slider-indicator left" id="brightness-indicator">
+      <span class="mx-slider-icon">☀️</span>
+      <div class="mx-bar-wrap">
+        <div class="mx-bar-fill" id="brightness-bar" style="height: 100%;"></div>
+      </div>
+      <span class="mx-slider-text" id="brightness-text">100%</span>
+    </div>
+
+    <!-- MX Player Right Slider: Volume -->
+    <div class="mx-slider-indicator right" id="volume-indicator">
+      <span class="mx-slider-icon" id="volume-icon">🔊</span>
+      <div class="mx-bar-wrap">
+        <div class="mx-bar-fill" id="volume-bar" style="height: 100%;"></div>
+      </div>
+      <span class="mx-slider-text" id="volume-text">100%</span>
+    </div>
+
+    <!-- Double Tap 10s Seek Ripples -->
     <div class="seek-ripple left" id="seek-left">⏪ 10s</div>
     <div class="seek-ripple right" id="seek-right">10s ⏩</div>
 
@@ -440,35 +530,59 @@
     });
 
     // ==========================================
-    // TOUCH GESTURES: DOUBLE TAP, HOLD 2X & SLIDE
+    // MX PLAYER GESTURES & HUD LOGIC
     // ==========================================
     const container = document.getElementById('touch-container');
-    const badge = document.getElementById('gesture-badge');
     const bOverlay = document.getElementById('brightness-overlay');
+    const speedBadge = document.getElementById('speed-badge');
+
+    const bIndicator = document.getElementById('brightness-indicator');
+    const bBar = document.getElementById('brightness-bar');
+    const bText = document.getElementById('brightness-text');
+
+    const vIndicator = document.getElementById('volume-indicator');
+    const vBar = document.getElementById('volume-bar');
+    const vText = document.getElementById('volume-text');
+    const vIcon = document.getElementById('volume-icon');
+
     const seekLeftEl = document.getElementById('seek-left');
     const seekRightEl = document.getElementById('seek-right');
 
-    let badgeTimer = null;
-    function showBadge(text) {
-      badge.textContent = text;
-      badge.classList.add('active');
-      clearTimeout(badgeTimer);
-      badgeTimer = setTimeout(() => badge.classList.remove('active'), 800);
+    let hideSlidersTimer = null;
+    function triggerHideSliders() {
+      clearTimeout(hideSlidersTimer);
+      hideSlidersTimer = setTimeout(() => {
+        bIndicator.classList.remove('active');
+        vIndicator.classList.remove('active');
+      }, 700);
     }
 
-    // Brightness state (0% to 100%)
+    // Brightness Control
     let brightness = 100;
     function setBrightness(val) {
       brightness = Math.max(10, Math.min(100, val));
       bOverlay.style.opacity = (1 - (brightness / 100)) * 0.85;
-      showBadge(`☀️ Brightness: ${Math.round(brightness)}%`);
+
+      bBar.style.height = `${brightness}%`;
+      bText.textContent = `${Math.round(brightness)}%`;
+      bIndicator.classList.add('active');
+      vIndicator.classList.remove('active');
+      triggerHideSliders();
     }
 
-    // Volume state (0 to 1)
+    // Volume Control
     function setVolume(val) {
       const vol = Math.max(0, Math.min(1, val));
       player.volume(vol);
-      showBadge(`🔊 Volume: ${Math.round(vol * 100)}%`);
+
+      const percent = Math.round(vol * 100);
+      vBar.style.height = `${percent}%`;
+      vText.textContent = `${percent}%`;
+      vIcon.textContent = percent === 0 ? '🔇' : percent < 50 ? '🔉' : '🔊';
+
+      vIndicator.classList.add('active');
+      bIndicator.classList.remove('active');
+      triggerHideSliders();
     }
 
     let startX = 0, startY = 0;
@@ -482,8 +596,7 @@
     let prevPlaybackRate = 1.0;
 
     container.addEventListener('touchstart', function(e) {
-      const target = e.target;
-      if (target.closest('.vjs-control-bar')) return;
+      if (e.target.closest('.vjs-control-bar')) return;
 
       const touch = e.touches[0];
       startX = touch.clientX;
@@ -495,15 +608,15 @@
       swipeSide = (startX - rect.left < rect.width / 2) ? 'left' : 'right';
       startVal = (swipeSide === 'left') ? brightness : player.volume();
 
-      // Press & Hold for 2x Trigger (hold for 400ms)
+      // HOLD DETECTION: 350ms tak hold kiya to 2X Speed ON
       holdTimeout = setTimeout(() => {
         if (!player.paused()) {
           is2xActive = true;
           prevPlaybackRate = player.playbackRate();
           player.playbackRate(2.0);
-          showBadge('⚡ 2X Fast Forward');
+          speedBadge.classList.add('active');
         }
-      }, 400);
+      }, 350);
     }, { passive: true });
 
     container.addEventListener('touchmove', function(e) {
@@ -513,19 +626,19 @@
       const deltaX = touch.clientX - startX;
       const deltaY = touch.clientY - startY;
 
-      // Agar move hone laga toh press-hold cancel karo
+      // Agar ungli slide hui toh 2x hold cancel karo
       if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
         clearTimeout(holdTimeout);
       }
 
-      // Vertical swipe detect
+      // Vertical swipe detect (MX Player style)
       if (!isVerticalSwipe && Math.abs(deltaY) > 20 && Math.abs(deltaY) > Math.abs(deltaX)) {
         isVerticalSwipe = true;
       }
 
       if (isVerticalSwipe) {
         const height = container.clientHeight;
-        const diff = (-deltaY / height); // up is positive
+        const diff = (-deltaY / height); // up swipe = positive, down swipe = negative
 
         if (swipeSide === 'left') {
           setBrightness(startVal + diff * 100);
@@ -538,11 +651,11 @@
     container.addEventListener('touchend', function(e) {
       clearTimeout(holdTimeout);
 
-      // Revert 2x speed if hold was active
+      // Ungli chhodte hi 2X wapas normal speed me convert hoga
       if (is2xActive) {
         is2xActive = false;
         player.playbackRate(prevPlaybackRate);
-        badge.classList.remove('active');
+        speedBadge.classList.remove('active');
         return;
       }
 
@@ -554,19 +667,19 @@
       const touchDuration = Date.now() - initialTouchTime;
       const now = Date.now();
 
-      // Double-Tap detection (< 300ms between taps)
+      // Double Tap detection (< 280ms)
       if (touchDuration < 250) {
-        if (now - lastTapTime < 300) {
+        if (now - lastTapTime < 280) {
           const rect = container.getBoundingClientRect();
           const tapX = startX - rect.left;
 
           if (tapX < rect.width / 2) {
-            // Left double-tap: backward 10s
+            // Left Double Tap: -10s
             player.currentTime(Math.max(0, player.currentTime() - 10));
             seekLeftEl.classList.add('active');
             setTimeout(() => seekLeftEl.classList.remove('active'), 500);
           } else {
-            // Right double-tap: forward 10s
+            // Right Double Tap: +10s
             player.currentTime(player.currentTime() + 10);
             seekRightEl.classList.add('active');
             setTimeout(() => seekRightEl.classList.remove('active'), 500);
