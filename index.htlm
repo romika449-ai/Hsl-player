@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>smooth player · HSL / HLS</title>
+  <!-- Video.js + HLS plugin -->
+  <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
+  <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-hls/5.15.0/videojs-contrib-hls.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: linear-gradient(145deg, #0b0e14 0%, #1a1f2a 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+      padding: 16px;
+    }
+    .player-wrapper {
+      max-width: 1000px;
+      width: 100%;
+      background: rgba(20, 25, 35, 0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 40px;
+      padding: 20px 20px 28px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
+    }
+    .video-container {
+      position: relative;
+      border-radius: 28px;
+      overflow: hidden;
+      background: #0b0e14;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      user-select: none;
+      touch-action: none;
+    }
+
+    /* Screen Brightness Overlay */
+    #brightness-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 10;
+      transition: opacity 0.05s ease;
+    }
+
+    /* Gesture Status Badge */
+    .gesture-badge {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      background: rgba(10, 14, 22, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 20;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .gesture-badge.active {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* Double Tap Seek Feedback Ripples */
+    .seek-ripple {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 45%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: bold;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 15;
+      background: rgba(255, 255, 255, 0.08);
+      transition: opacity 0.25s ease;
+    }
+    .seek-ripple.left {
+      left: 0;
+      border-radius: 28px 0 0 28px;
+    }
+    .seek-ripple.right {
+      right: 0;
+      border-radius: 0 28px 28px 0;
+    }
+    .seek-ripple.active {
+      opacity: 1;
+    }
+
+    /* Control Bar Alignment */
+    .video-js .vjs-control-bar {
+      background: rgba(10, 14, 22, 0.85) !important;
+      backdrop-filter: blur(14px) saturate(1.4);
+      border-radius: 60px !important;
+      margin: 0 12px 16px 12px !important;
+      width: auto !important;
+      padding: 0 16px !important;
+      height: 56px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03);
+      border: none !important;
+      gap: 4px;
+      z-index: 25;
+    }
+
+    .video-js .vjs-control {
+      color: #f0f4ff !important;
+      opacity: 0.9;
+      transition: 0.15s;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      height: 100% !important;
+      line-height: 1 !important;
+      flex-shrink: 0 !important;
+    }
+    .video-js .vjs-control:hover {
+      opacity: 1;
+      color: #fff !important;
+    }
+
+    .video-js .vjs-play-control {
+      font-size: 1.5em !important;
+      margin-right: 2px !important;
+      width: 40px !important;
+    }
+
+    .video-js .vjs-time-control {
+      font-size: 0.85rem !important;
+      padding: 0 4px !important;
+      color: #bcc8e6 !important;
+      line-height: 1 !important;
+      display: flex !important;
+      align-items: center !important;
+      height: 100% !important;
+    }
+    .video-js .vjs-current-time {
+      margin-left: 2px !important;
+    }
+    .video-js .vjs-remaining-time,
+    .video-js .vjs-time-divider {
+      display: none !important;
+    }
+
+    .video-js .vjs-progress-control {
+      flex: 3 1 auto !important;
+      min-width: 80px !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      padding: 0 8px !important;
+      margin: 0 4px !important;
+    }
+    .video-js .vjs-progress-control .vjs-progress-holder {
+      background: rgba(255, 255, 255, 0.12) !important;
+      border-radius: 20px !important;
+      height: 6px !important;
+      margin: 0 !important;
+    }
+    .video-js .vjs-progress-control .vjs-play-progress {
+      background: #6c8cff !important;
+      border-radius: 20px !important;
+    }
+
+    .video-js .vjs-volume-panel {
+      display: flex !important;
+      align-items: center !important;
+      height: 100% !important;
+      margin-left: 2px !important;
+      flex-shrink: 0 !important;
+    }
+    .video-js .vjs-mute-control {
+      width: 36px !important;
+      margin-right: 0 !important;
+    }
+    .video-js .vjs-volume-bar {
+      background: rgba(255, 255, 255, 0.2) !important;
+    }
+    .video-js .vjs-volume-level {
+      background: #6c8cff !important;
+    }
+
+    .speed-select-wrap {
+      display: flex !important;
+      align-items: center !important;
+      height: 100% !important;
+      margin: 0 2px !important;
+      flex-shrink: 0 !important;
+    }
+    .speed-select-wrap select {
+      background: rgba(20, 28, 44, 0.7);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 40px;
+      padding: 5px 28px 5px 14px;
+      color: #d3defa;
+      font-weight: 500;
+      font-size: 0.8rem;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a0b4e0' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 10px;
+      min-width: 68px;
+      transition: 0.15s;
+      height: 32px !important;
+      display: flex !important;
+      align-items: center !important;
+      line-height: 1 !important;
+    }
+    .speed-select-wrap select:hover {
+      background-color: rgba(40, 52, 80, 0.7);
+      border-color: rgba(108, 140, 255, 0.3);
+    }
+    .speed-select-wrap select option {
+      background: #1e2638;
+      color: #eaf0ff;
+    }
+
+    .video-js .vjs-fullscreen-control {
+      display: flex !important;
+      margin-left: 2px !important;
+      font-size: 1.4em !important;
+      width: 40px !important;
+      height: 100% !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    .video-js .vjs-picture-in-picture-control,
+    .video-js .vjs-captions-button,
+    .video-js .vjs-seek-button,
+    .video-js .vjs-seek-to-live-control,
+    .video-js .vjs-big-play-button {
+      display: none !important;
+    }
+
+    @media (max-width: 768px) {
+      .video-js .vjs-control-bar {
+        height: 50px !important;
+        padding: 0 12px !important;
+        margin: 0 8px 12px 8px !important;
+        gap: 2px;
+      }
+      .video-js .vjs-progress-control {
+        min-width: 60px !important;
+        padding: 0 4px !important;
+      }
+      .video-js .vjs-current-time, .video-js .vjs-duration {
+        font-size: 0.75rem !important;
+      }
+      .speed-select-wrap select {
+        font-size: 0.7rem;
+        padding: 4px 24px 4px 10px;
+        min-width: 58px;
+        height: 28px !important;
+      }
+      .video-js .vjs-play-control {
+        font-size: 1.3em !important;
+        width: 34px !important;
+      }
+      .video-js .vjs-fullscreen-control {
+        font-size: 1.2em !important;
+        width: 34px !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .player-wrapper {
+        padding: 8px 8px 14px;
+        border-radius: 24px;
+      }
+      .video-js .vjs-control-bar {
+        height: 42px !important;
+        padding: 0 8px !important;
+        margin: 0 4px 8px 4px !important;
+        border-radius: 40px !important;
+        gap: 1px;
+      }
+      .video-js .vjs-progress-control {
+        min-width: 40px !important;
+        padding: 0 2px !important;
+        margin: 0 2px !important;
+      }
+      .video-js .vjs-current-time, .video-js .vjs-duration {
+        font-size: 0.6rem !important;
+        padding: 0 2px !important;
+      }
+      .speed-select-wrap select {
+        font-size: 0.6rem;
+        padding: 2px 20px 2px 8px;
+        min-width: 48px;
+        height: 24px !important;
+        background-position: right 6px center;
+      }
+      .video-js .vjs-play-control {
+        font-size: 1.1em !important;
+        width: 28px !important;
+      }
+      .video-js .vjs-fullscreen-control {
+        font-size: 1em !important;
+        width: 28px !important;
+      }
+      .video-js .vjs-mute-control {
+        width: 28px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="player-wrapper">
+  <div class="video-container" id="touch-container">
+    <div id="brightness-overlay"></div>
+
+    <!-- Live Status Indicators -->
+    <div class="gesture-badge" id="gesture-badge"></div>
+    <div class="seek-ripple left" id="seek-left">⏪ 10s</div>
+    <div class="seek-ripple right" id="seek-right">10s ⏩</div>
+
+    <video
+      id="my-player"
+      class="video-js vjs-default-skin"
+      controls
+      preload="auto"
+      playsinline
+      data-setup='{"fluid": true, "html5": {"hls": {"enableLowInitialPlaylist": true, "overrideNative": true}}}'
+    >
+      <source src="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" type="application/x-mpegURL">
+      <p class="vjs-no-js">Please enable JavaScript to view this player.</p>
+    </video>
+  </div>
+</div>
+
+<div style="margin-top: 20px; text-align: center; width: 100%; max-width: 1000px;">
+  <input type="text" id="videoUrl" placeholder="M3U8 / HSL video link daalein" 
+         style="width: 65%; padding: 12px 20px; border-radius: 30px; border: none; background: #1a1f2a; color: white; font-size: 14px; outline: none; border: 1px solid rgba(255,255,255,0.1);">
+  <button onclick="changeVideo()" 
+          style="padding: 12px 30px; border-radius: 30px; border: none; background: #6c8cff; color: white; font-weight: bold; cursor: pointer; margin-left: 10px; font-size: 14px; transition: 0.2s;">
+    Load Video
+  </button>
+</div>
+
+<script>
+  (function() {
+    const player = videojs('my-player', {
+      controls: true,
+      autoplay: false,
+      responsive: true,
+      controlBar: {
+        children: [
+          'playToggle',
+          'currentTimeDisplay',
+          'durationDisplay',
+          'progressControl',
+          'volumePanel',
+          { name: 'customSpeed', type: 'custom' },
+          'fullscreenToggle'
+        ]
+      }
+    });
+
+    // Spacebar & Arrow keys
+    document.addEventListener('keydown', function(e) {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        player.paused() ? player.play() : player.pause();
+      } else if (e.key === 'ArrowRight' && !e.shiftKey && !e.ctrlKey) {
+        e.preventDefault();
+        player.currentTime((player.currentTime() || 0) + 10);
+      } else if (e.key === 'ArrowLeft' && !e.shiftKey && !e.ctrlKey) {
+        e.preventDefault();
+        player.currentTime(Math.max(0, (player.currentTime() || 0) - 10));
+      }
+    });
+
+    let speedSelect;
+    player.ready(function() {
+      speedSelect = document.createElement('select');
+      speedSelect.className = 'vjs-speed-select';
+      [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s + '×';
+        if (s === 1.0) opt.selected = true;
+        speedSelect.appendChild(opt);
+      });
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'speed-select-wrap';
+      wrapper.appendChild(speedSelect);
+
+      const controlBar = player.controlBar.el();
+      const volumePanel = controlBar.querySelector('.vjs-volume-panel');
+      if (volumePanel) {
+        volumePanel.parentNode.insertBefore(wrapper, volumePanel.nextSibling);
+      } else {
+        controlBar.appendChild(wrapper);
+      }
+
+      speedSelect.addEventListener('change', function() {
+        const val = parseFloat(this.value);
+        if (!isNaN(val)) player.playbackRate(val);
+      });
+
+      player.playbackRate(1.0);
+    });
+
+    // ==========================================
+    // TOUCH GESTURES: DOUBLE TAP, HOLD 2X & SLIDE
+    // ==========================================
+    const container = document.getElementById('touch-container');
+    const badge = document.getElementById('gesture-badge');
+    const bOverlay = document.getElementById('brightness-overlay');
+    const seekLeftEl = document.getElementById('seek-left');
+    const seekRightEl = document.getElementById('seek-right');
+
+    let badgeTimer = null;
+    function showBadge(text) {
+      badge.textContent = text;
+      badge.classList.add('active');
+      clearTimeout(badgeTimer);
+      badgeTimer = setTimeout(() => badge.classList.remove('active'), 800);
+    }
+
+    // Brightness state (0% to 100%)
+    let brightness = 100;
+    function setBrightness(val) {
+      brightness = Math.max(10, Math.min(100, val));
+      bOverlay.style.opacity = (1 - (brightness / 100)) * 0.85;
+      showBadge(`☀️ Brightness: ${Math.round(brightness)}%`);
+    }
+
+    // Volume state (0 to 1)
+    function setVolume(val) {
+      const vol = Math.max(0, Math.min(1, val));
+      player.volume(vol);
+      showBadge(`🔊 Volume: ${Math.round(vol * 100)}%`);
+    }
+
+    let startX = 0, startY = 0;
+    let initialTouchTime = 0;
+    let isVerticalSwipe = false;
+    let swipeSide = null; // 'left' or 'right'
+    let startVal = 0;
+    let holdTimeout = null;
+    let is2xActive = false;
+    let lastTapTime = 0;
+    let prevPlaybackRate = 1.0;
+
+    container.addEventListener('touchstart', function(e) {
+      const target = e.target;
+      if (target.closest('.vjs-control-bar')) return;
+
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      initialTouchTime = Date.now();
+      isVerticalSwipe = false;
+
+      const rect = container.getBoundingClientRect();
+      swipeSide = (startX - rect.left < rect.width / 2) ? 'left' : 'right';
+      startVal = (swipeSide === 'left') ? brightness : player.volume();
+
+      // Press & Hold for 2x Trigger (hold for 400ms)
+      holdTimeout = setTimeout(() => {
+        if (!player.paused()) {
+          is2xActive = true;
+          prevPlaybackRate = player.playbackRate();
+          player.playbackRate(2.0);
+          showBadge('⚡ 2X Fast Forward');
+        }
+      }, 400);
+    }, { passive: true });
+
+    container.addEventListener('touchmove', function(e) {
+      if (e.target.closest('.vjs-control-bar')) return;
+
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - startX;
+      const deltaY = touch.clientY - startY;
+
+      // Agar move hone laga toh press-hold cancel karo
+      if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+        clearTimeout(holdTimeout);
+      }
+
+      // Vertical swipe detect
+      if (!isVerticalSwipe && Math.abs(deltaY) > 20 && Math.abs(deltaY) > Math.abs(deltaX)) {
+        isVerticalSwipe = true;
+      }
+
+      if (isVerticalSwipe) {
+        const height = container.clientHeight;
+        const diff = (-deltaY / height); // up is positive
+
+        if (swipeSide === 'left') {
+          setBrightness(startVal + diff * 100);
+        } else {
+          setVolume(startVal + diff);
+        }
+      }
+    }, { passive: true });
+
+    container.addEventListener('touchend', function(e) {
+      clearTimeout(holdTimeout);
+
+      // Revert 2x speed if hold was active
+      if (is2xActive) {
+        is2xActive = false;
+        player.playbackRate(prevPlaybackRate);
+        badge.classList.remove('active');
+        return;
+      }
+
+      if (isVerticalSwipe) {
+        isVerticalSwipe = false;
+        return;
+      }
+
+      const touchDuration = Date.now() - initialTouchTime;
+      const now = Date.now();
+
+      // Double-Tap detection (< 300ms between taps)
+      if (touchDuration < 250) {
+        if (now - lastTapTime < 300) {
+          const rect = container.getBoundingClientRect();
+          const tapX = startX - rect.left;
+
+          if (tapX < rect.width / 2) {
+            // Left double-tap: backward 10s
+            player.currentTime(Math.max(0, player.currentTime() - 10));
+            seekLeftEl.classList.add('active');
+            setTimeout(() => seekLeftEl.classList.remove('active'), 500);
+          } else {
+            // Right double-tap: forward 10s
+            player.currentTime(player.currentTime() + 10);
+            seekRightEl.classList.add('active');
+            setTimeout(() => seekRightEl.classList.remove('active'), 500);
+          }
+          lastTapTime = 0;
+        } else {
+          lastTapTime = now;
+        }
+      }
+    });
+
+  })();
+
+  function changeVideo() {
+    const url = document.getElementById('videoUrl').value.trim();
+    if (url) {
+      const player = videojs('my-player');
+      player.src({
+        src: url,
+        type: 'application/x-mpegURL'
+      });
+      player.load();
+      player.play();
+    } else {
+      alert('Kripya ek valid video link daalein!');
+    }
+  }
+</script>
+
+</body>
+</html>
