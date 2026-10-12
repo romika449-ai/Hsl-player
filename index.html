@@ -413,33 +413,6 @@
 
 <div class="player-wrapper">
   <div class="video-container" id="touch-container">
-    <div id="brightness-overlay"></div>
-
-    <!-- 2X Speed Floating Badge -->
-    <div class="mx-speed-badge" id="speed-badge">▶▶ 2X Speed</div>
-
-    <!-- MX Player Left Slider: Brightness -->
-    <div class="mx-slider-indicator left" id="brightness-indicator">
-      <span class="mx-slider-icon">☀️</span>
-      <div class="mx-bar-wrap">
-        <div class="mx-bar-fill" id="brightness-bar" style="height: 100%;"></div>
-      </div>
-      <span class="mx-slider-text" id="brightness-text">100%</span>
-    </div>
-
-    <!-- MX Player Right Slider: Volume -->
-    <div class="mx-slider-indicator right" id="volume-indicator">
-      <span class="mx-slider-icon" id="volume-icon">🔊</span>
-      <div class="mx-bar-wrap">
-        <div class="mx-bar-fill" id="volume-bar" style="height: 100%;"></div>
-      </div>
-      <span class="mx-slider-text" id="volume-text">100%</span>
-    </div>
-
-    <!-- Double Tap 10s Seek Ripples -->
-    <div class="seek-ripple left" id="seek-left">⏪ 10s</div>
-    <div class="seek-ripple right" id="seek-right">10s ⏩</div>
-
     <video
       id="my-player"
       class="video-js vjs-default-skin"
@@ -499,6 +472,7 @@
 
     let speedSelect;
     player.ready(function() {
+      // Speed selector add karna
       speedSelect = document.createElement('select');
       speedSelect.className = 'vjs-speed-select';
       [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].forEach(s => {
@@ -527,169 +501,190 @@
       });
 
       player.playbackRate(1.0);
+
+      // ===== SARE OVERLAYS PLAYER KE ANDAR INJECT KARNA (FULLSCREEN FIX) =====
+      const playerEl = player.el();
+
+      const overlayHtml = `
+        <div id="brightness-overlay"></div>
+        <div class="mx-speed-badge" id="speed-badge">▶▶ 2X Speed</div>
+        <div class="mx-slider-indicator left" id="brightness-indicator">
+          <span class="mx-slider-icon">☀️</span>
+          <div class="mx-bar-wrap">
+            <div class="mx-bar-fill" id="brightness-bar" style="height: 100%;"></div>
+          </div>
+          <span class="mx-slider-text" id="brightness-text">100%</span>
+        </div>
+        <div class="mx-slider-indicator right" id="volume-indicator">
+          <span class="mx-slider-icon" id="volume-icon">🔊</span>
+          <div class="mx-bar-wrap">
+            <div class="mx-bar-fill" id="volume-bar" style="height: 100%;"></div>
+          </div>
+          <span class="mx-slider-text" id="volume-text">100%</span>
+        </div>
+        <div class="seek-ripple left" id="seek-left">⏪ 10s</div>
+        <div class="seek-ripple right" id="seek-right">10s ⏩</div>
+      `;
+      playerEl.insertAdjacentHTML('beforeend', overlayHtml);
+
+      initGestures(playerEl);
     });
 
-    // ==========================================
-    // MX PLAYER GESTURES & HUD LOGIC
-    // ==========================================
-    const container = document.getElementById('touch-container');
-    const bOverlay = document.getElementById('brightness-overlay');
-    const speedBadge = document.getElementById('speed-badge');
+    function initGestures(playerEl) {
+      const bOverlay = playerEl.querySelector('#brightness-overlay');
+      const speedBadge = playerEl.querySelector('#speed-badge');
+      const bIndicator = playerEl.querySelector('#brightness-indicator');
+      const bBar = playerEl.querySelector('#brightness-bar');
+      const bText = playerEl.querySelector('#brightness-text');
 
-    const bIndicator = document.getElementById('brightness-indicator');
-    const bBar = document.getElementById('brightness-bar');
-    const bText = document.getElementById('brightness-text');
+      const vIndicator = playerEl.querySelector('#volume-indicator');
+      const vBar = playerEl.querySelector('#volume-bar');
+      const vText = playerEl.querySelector('#volume-text');
+      const vIcon = playerEl.querySelector('#volume-icon');
 
-    const vIndicator = document.getElementById('volume-indicator');
-    const vBar = document.getElementById('volume-bar');
-    const vText = document.getElementById('volume-text');
-    const vIcon = document.getElementById('volume-icon');
+      const seekLeftEl = playerEl.querySelector('#seek-left');
+      const seekRightEl = playerEl.querySelector('#seek-right');
 
-    const seekLeftEl = document.getElementById('seek-left');
-    const seekRightEl = document.getElementById('seek-right');
+      let hideSlidersTimer = null;
+      function triggerHideSliders() {
+        clearTimeout(hideSlidersTimer);
+        hideSlidersTimer = setTimeout(() => {
+          bIndicator.classList.remove('active');
+          vIndicator.classList.remove('active');
+        }, 700);
+      }
 
-    let hideSlidersTimer = null;
-    function triggerHideSliders() {
-      clearTimeout(hideSlidersTimer);
-      hideSlidersTimer = setTimeout(() => {
-        bIndicator.classList.remove('active');
+      // Brightness Control
+      let brightness = 100;
+      function setBrightness(val) {
+        brightness = Math.max(10, Math.min(100, val));
+        bOverlay.style.opacity = (1 - (brightness / 100)) * 0.85;
+
+        bBar.style.height = `${brightness}%`;
+        bText.textContent = `${Math.round(brightness)}%`;
+        bIndicator.classList.add('active');
         vIndicator.classList.remove('active');
-      }, 700);
-    }
-
-    // Brightness Control
-    let brightness = 100;
-    function setBrightness(val) {
-      brightness = Math.max(10, Math.min(100, val));
-      bOverlay.style.opacity = (1 - (brightness / 100)) * 0.85;
-
-      bBar.style.height = `${brightness}%`;
-      bText.textContent = `${Math.round(brightness)}%`;
-      bIndicator.classList.add('active');
-      vIndicator.classList.remove('active');
-      triggerHideSliders();
-    }
-
-    // Volume Control
-    function setVolume(val) {
-      const vol = Math.max(0, Math.min(1, val));
-      player.volume(vol);
-
-      const percent = Math.round(vol * 100);
-      vBar.style.height = `${percent}%`;
-      vText.textContent = `${percent}%`;
-      vIcon.textContent = percent === 0 ? '🔇' : percent < 50 ? '🔉' : '🔊';
-
-      vIndicator.classList.add('active');
-      bIndicator.classList.remove('active');
-      triggerHideSliders();
-    }
-
-    let startX = 0, startY = 0;
-    let initialTouchTime = 0;
-    let isVerticalSwipe = false;
-    let swipeSide = null; // 'left' or 'right'
-    let startVal = 0;
-    let holdTimeout = null;
-    let is2xActive = false;
-    let lastTapTime = 0;
-    let prevPlaybackRate = 1.0;
-
-    container.addEventListener('touchstart', function(e) {
-      if (e.target.closest('.vjs-control-bar')) return;
-
-      const touch = e.touches[0];
-      startX = touch.clientX;
-      startY = touch.clientY;
-      initialTouchTime = Date.now();
-      isVerticalSwipe = false;
-
-      const rect = container.getBoundingClientRect();
-      swipeSide = (startX - rect.left < rect.width / 2) ? 'left' : 'right';
-      startVal = (swipeSide === 'left') ? brightness : player.volume();
-
-      // HOLD DETECTION: 350ms tak hold kiya to 2X Speed ON
-      holdTimeout = setTimeout(() => {
-        if (!player.paused()) {
-          is2xActive = true;
-          prevPlaybackRate = player.playbackRate();
-          player.playbackRate(2.0);
-          speedBadge.classList.add('active');
-        }
-      }, 350);
-    }, { passive: true });
-
-    container.addEventListener('touchmove', function(e) {
-      if (e.target.closest('.vjs-control-bar')) return;
-
-      const touch = e.touches[0];
-      const deltaX = touch.clientX - startX;
-      const deltaY = touch.clientY - startY;
-
-      // Agar ungli slide hui toh 2x hold cancel karo
-      if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-        clearTimeout(holdTimeout);
+        triggerHideSliders();
       }
 
-      // Vertical swipe detect (MX Player style)
-      if (!isVerticalSwipe && Math.abs(deltaY) > 20 && Math.abs(deltaY) > Math.abs(deltaX)) {
-        isVerticalSwipe = true;
+      // Volume Control
+      function setVolume(val) {
+        const vol = Math.max(0, Math.min(1, val));
+        player.volume(vol);
+
+        const percent = Math.round(vol * 100);
+        vBar.style.height = `${percent}%`;
+        vText.textContent = `${percent}%`;
+        vIcon.textContent = percent === 0 ? '🔇' : percent < 50 ? '🔉' : '🔊';
+
+        vIndicator.classList.add('active');
+        bIndicator.classList.remove('active');
+        triggerHideSliders();
       }
 
-      if (isVerticalSwipe) {
-        const height = container.clientHeight;
-        const diff = (-deltaY / height); // up swipe = positive, down swipe = negative
+      let startX = 0, startY = 0;
+      let initialTouchTime = 0;
+      let isVerticalSwipe = false;
+      let swipeSide = null;
+      let startVal = 0;
+      let holdTimeout = null;
+      let is2xActive = false;
+      let lastTapTime = 0;
+      let prevPlaybackRate = 1.0;
 
-        if (swipeSide === 'left') {
-          setBrightness(startVal + diff * 100);
-        } else {
-          setVolume(startVal + diff);
-        }
-      }
-    }, { passive: true });
+      playerEl.addEventListener('touchstart', function(e) {
+        if (e.target.closest('.vjs-control-bar')) return;
 
-    container.addEventListener('touchend', function(e) {
-      clearTimeout(holdTimeout);
-
-      // Ungli chhodte hi 2X wapas normal speed me convert hoga
-      if (is2xActive) {
-        is2xActive = false;
-        player.playbackRate(prevPlaybackRate);
-        speedBadge.classList.remove('active');
-        return;
-      }
-
-      if (isVerticalSwipe) {
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        initialTouchTime = Date.now();
         isVerticalSwipe = false;
-        return;
-      }
 
-      const touchDuration = Date.now() - initialTouchTime;
-      const now = Date.now();
+        const rect = playerEl.getBoundingClientRect();
+        swipeSide = (startX - rect.left < rect.width / 2) ? 'left' : 'right';
+        startVal = (swipeSide === 'left') ? brightness : player.volume();
 
-      // Double Tap detection (< 280ms)
-      if (touchDuration < 250) {
-        if (now - lastTapTime < 280) {
-          const rect = container.getBoundingClientRect();
-          const tapX = startX - rect.left;
-
-          if (tapX < rect.width / 2) {
-            // Left Double Tap: -10s
-            player.currentTime(Math.max(0, player.currentTime() - 10));
-            seekLeftEl.classList.add('active');
-            setTimeout(() => seekLeftEl.classList.remove('active'), 500);
-          } else {
-            // Right Double Tap: +10s
-            player.currentTime(player.currentTime() + 10);
-            seekRightEl.classList.add('active');
-            setTimeout(() => seekRightEl.classList.remove('active'), 500);
+        // 350ms Hold ke baad 2X speed on
+        holdTimeout = setTimeout(() => {
+          if (!player.paused()) {
+            is2xActive = true;
+            prevPlaybackRate = player.playbackRate();
+            player.playbackRate(2.0);
+            speedBadge.classList.add('active');
           }
-          lastTapTime = 0;
-        } else {
-          lastTapTime = now;
+        }, 350);
+      }, { passive: true });
+
+      playerEl.addEventListener('touchmove', function(e) {
+        if (e.target.closest('.vjs-control-bar')) return;
+
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - startX;
+        const deltaY = touch.clientY - startY;
+
+        // Slide hone par hold cancel
+        if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+          clearTimeout(holdTimeout);
         }
-      }
-    });
+
+        if (!isVerticalSwipe && Math.abs(deltaY) > 20 && Math.abs(deltaY) > Math.abs(deltaX)) {
+          isVerticalSwipe = true;
+        }
+
+        if (isVerticalSwipe) {
+          const height = playerEl.clientHeight;
+          const diff = (-deltaY / height);
+
+          if (swipeSide === 'left') {
+            setBrightness(startVal + diff * 100);
+          } else {
+            setVolume(startVal + diff);
+          }
+        }
+      }, { passive: true });
+
+      playerEl.addEventListener('touchend', function(e) {
+        clearTimeout(holdTimeout);
+
+        // Hold chhodte hi normal speed
+        if (is2xActive) {
+          is2xActive = false;
+          player.playbackRate(prevPlaybackRate);
+          speedBadge.classList.remove('active');
+          return;
+        }
+
+        if (isVerticalSwipe) {
+          isVerticalSwipe = false;
+          return;
+        }
+
+        const touchDuration = Date.now() - initialTouchTime;
+        const now = Date.now();
+
+        // Double Tap check
+        if (touchDuration < 250) {
+          if (now - lastTapTime < 280) {
+            const rect = playerEl.getBoundingClientRect();
+            const tapX = startX - rect.left;
+
+            if (tapX < rect.width / 2) {
+              player.currentTime(Math.max(0, player.currentTime() - 10));
+              seekLeftEl.classList.add('active');
+              setTimeout(() => seekLeftEl.classList.remove('active'), 500);
+            } else {
+              player.currentTime(player.currentTime() + 10);
+              seekRightEl.classList.add('active');
+              setTimeout(() => seekRightEl.classList.remove('active'), 500);
+            }
+            lastTapTime = 0;
+          } else {
+            lastTapTime = now;
+          }
+        }
+      });
+    }
 
   })();
 
